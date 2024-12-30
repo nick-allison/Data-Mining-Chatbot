@@ -1,4 +1,5 @@
 # Data Mining Chatbot
+![Chatbot Banner](img/data_bot1.png)
 
 Welcome to the source code repository for my **Data Mining Chatbot**! You can try the chatbot live here:
 
