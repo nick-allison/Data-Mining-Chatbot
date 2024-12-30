@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Data Mining Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .title-container {
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+    #chat-container {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .message {
+      margin-bottom: 10px;
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 60%;
+    }
+    .user-message {
+      background-color: #e0e0e0;
+      align-self: flex-end;
+      text-align: right;
+    }
+    .bot-message {
+      background-color: #ffd700;
+      align-self: flex-start;
+      text-align: left;
+    }
+    #input-container {
+      display: flex;
+      margin: 10px;
+    }
+    #user-input {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+    }
+    #send-button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="title-container">Data Mining Chatbot</div>
+  
+  <div id="chat-container"></div>
+
+  <div id="input-container">
+    <input id="user-input" type="text" placeholder="Ask a question..." />
+    <button id="send-button">Send</button>
+  </div>
+
+  <script>
+    // I picked this API URL after testing it with Postman.
+    const API_URL = "https://7j1zfs21w3.execute-api.us-east-2.amazonaws.com/dm_chat_bot";
+
+    // Just a little helper to cancel if I'm waiting too long.
+    async function fetchWithTimeout(resource, options = {}) {
+      const controller = new AbortController();
+      const signal = controller.signal;
+      const timeout = options.timeout || 5000;
+
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, timeout);
+
+      try {
+        return await fetch(resource, { ...options, signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    // I wanted an easy way to add chat bubbles to the page.
+    function appendMessage(text, isUser) {
+      const chatContainer = document.getElementById("chat-container");
+      const messageElem = document.createElement("div");
+      messageElem.classList.add("message");
+      messageElem.textContent = text;
+      messageElem.classList.add(isUser ? "user-message" : "bot-message");
+      chatContainer.appendChild(messageElem);
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // This is what triggers when I press the button or hit Enter.
+    async function sendMessage() {
+      const userInput = document.getElementById("user-input");
+      const text = userInput.value.trim();
+      if (!text) return;
+      appendMessage(text, true);
+      userInput.value = "";
+
+      try {
+        // Felt like 5 seconds is enough time to wait.
+        const response = await fetchWithTimeout(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: text }),
+          timeout: 15000
+        });
+
+        if (!response.ok) {
+          throw new Error("Status: " + response.status);
+        }
+
+        // My Lambda sends back something like { "answer": "...response..." }
+        const data = await response.json();
+        const chatbotAnswer = data.answer || "Hmm... I got nothing!";
+        appendMessage(chatbotAnswer, false);
+
+      } catch (error) {
+        // I want to know if it's a timeout or some other issue.
+        if (error.name === "AbortError") {
+          appendMessage("Too many people are using the chatbot.  Please wait 2 minutes, then try again.", false);
+        } else {
+          appendMessage("Error: Unable to get a response.", false);
+        }
+      }
+    }
+
+    // This is how I handle sending when the user hits Enter or clicks Send.
+    document.getElementById("send-button").addEventListener("click", sendMessage);
+    document.getElementById("user-input").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        sendMessage();
+      }
+    });
+  </script>
+</body>
+</html>
