@@ -1,0 +1,6 @@
+langchain-core
+langchain-openai
+langchain_community
+llama-index
+pydantic
+s3fs
